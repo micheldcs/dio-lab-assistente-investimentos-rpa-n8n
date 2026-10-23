@@ -41,7 +41,7 @@ Respond to Webhook (retorna o resultado ao Colab)
 ```
 📁 dio-lab-assistente-investimentos-rpa-n8n/
 ├── 📄 README.md
-├── 📁 src/
+├── 📁 rpa/
 │   └── 📄 extrair_clientes.ipynb   # RPA: raspa os clientes e envia ao Webhook do n8n
 ├── 📁 n8n/
 │   └── 📄 workflow.json            # Workflow exportado do n8n
@@ -59,7 +59,7 @@ Respond to Webhook (retorna o resultado ao Colab)
    - **Google Gemini (PaLM) API**: chave gratuita gerada no Google AI Studio.
    - **Gmail OAuth2**: app OAuth criado no Google Cloud (Gmail API ativada, usuário de teste cadastrado e Redirect URI do n8n autorizada).
 3. **Ative o workflow** (toggle *Active* / *Publish*).
-4. No notebook `src/extrair_clientes.ipynb`, troque `COLE_AQUI_A_URL_DO_SEU_WEBHOOK` pela **Production URL** do nó Webhook (`.../webhook/clientes`).
+4. No notebook `rpa/extrair_clientes.ipynb`, troque `COLE_AQUI_A_URL_DO_SEU_WEBHOOK` pela **Production URL** do nó Webhook (`.../webhook/clientes`).
 5. Rode o notebook no Google Colab. A resposta deve vir com `Status n8n: 200`.
 6. Confira a execução no n8n em **Executions** (execução verde).
 
