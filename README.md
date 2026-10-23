@@ -141,7 +141,9 @@ Um nó **If** valida o destinatário com a regex `^[^@\s]+@[^@\s]+\.[^@\s]+$`. E
 - Execução de produção com sucesso na aba *Executions* do n8n.
 - E-mails gerados pela IA recebidos na caixa de entrada.
 
-*(adicione aqui os prints ou o link do vídeo)*
+   ![Colab - Status 200](docs/colab.png)
+   ![n8n - Executions](docs/executions.png)
+   ![E-mails gerados pela IA](docs/email.png)
 
 ---
 
