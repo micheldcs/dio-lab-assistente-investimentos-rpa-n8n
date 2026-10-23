@@ -1,1 +1,338 @@
-
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clientes",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -976,
+        -416
+      ],
+      "id": "63b36482-46a5-4edb-8f40-2e03beabeeb5",
+      "name": "Webhook",
+      "webhookId": "282e09e4-7fac-4681-a201-c373e8894e87"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        848,
+        -160
+      ],
+      "id": "20fea021-13f1-470e-89f6-950a0297345d",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== 1) Junta os dados que vieram do Merge =====\nconst itens = $input.all().map(i => i.json);\n\nlet clientes = [];\nlet investimentos = [];\n\nfor (const it of itens) {\n  if (it.body?.clientes) clientes = it.body.clientes;\n  if (it.clientes) clientes = it.clientes;\n  if (it.investimentos) investimentos = it.investimentos;\n}\n\n// ===== 2) Funções auxiliares =====\nconst paraNumero = (txt) =>\n  Number(String(txt).replace(/[^\\d,.-]/g, \"\").replace(/\\./g, \"\").replace(\",\", \".\")) || 0;\n\nconst brl = (n) =>\n  Number(n).toLocaleString(\"pt-BR\", { style: \"currency\", currency: \"BRL\" });\n\nconst normaliza = (s) =>\n  String(s || \"\").normalize(\"NFD\").replace(/[\\u0300-\\u036f]/g, \"\").trim().toLowerCase();\n\nconst pick = (arr) => arr[Math.floor(Math.random() * arr.length)];\n\n// Tom da mensagem por perfil (Etapa 4 do projeto)\nconst focoPerfil = {\n  conservador: \"Seu foco é renda fixa e segurança do patrimônio.\",\n  moderado: \"A ideia é um mix equilibrado entre renda fixa e variável.\",\n  arrojado: \"Aqui a ênfase é em ações e maior potencial de retorno.\"\n};\n\n// ===== 3) Recomendação por cliente =====\nconst resultados = clientes.map(c => {\n  const nome = c.nome;\n  const email = c.email;\n  const perfil = c.perfil;\n  const saldoNum = paraNumero(c.saldo);\n\n  // Produtos do mesmo perfil, do menor para o maior mínimo\n  const doPerfil = investimentos\n    .filter(i => normaliza(i.perfil) === normaliza(perfil))\n    .map(i => ({ ...i, minimo: Number(i.minimo) || 0 }))\n    .sort((a, b) => a.minimo - b.minimo);\n\n  // Produtos que o saldo já cobre\n  const cabem = doPerfil.filter(i => i.minimo <= saldoNum);\n\n  let escolhido, motivo, mensagens;\n\n  if (doPerfil.length === 0) {\n    escolhido = null;\n    motivo = \"sem_produto_para_perfil\";\n    mensagens = [\n      `Olá ${nome}! No momento não temos produtos cadastrados para o perfil ${perfil}. Em breve entraremos em contato.`\n    ];\n  } else if (cabem.length > 0) {\n    escolhido = cabem[cabem.length - 1]; // o de maior mínimo que o saldo cobre\n    motivo = \"saldo_ok\";\n    const p = escolhido;\n    mensagens = [\n      `Olá ${nome}! Pelo seu perfil (${perfil}), uma boa opção é **${p.produto}** (mínimo ${brl(p.minimo)}). Com seu saldo atual (${brl(saldoNum)}), você já consegue investir. Rentabilidade: ${p.rentabilidade}.`,\n      `Oi ${nome}! Recomendação para perfil ${perfil}: **${p.produto}** (mínimo ${brl(p.minimo)}). Seu saldo (${brl(saldoNum)}) já atende o mínimo. Rentabilidade: ${p.rentabilidade}.`,\n      `${nome}, indo direto ao ponto: para o perfil ${perfil}, **${p.produto}** (mínimo ${brl(p.minimo)}). Você tem ${brl(saldoNum)}, então dá pra aplicar. Rentabilidade: ${p.rentabilidade}.`\n    ];\n  } else {\n    escolhido = doPerfil[0]; // o de menor mínimo, que é o mais próximo\n    motivo = \"saldo_insuficiente\";\n    const p = escolhido;\n    const falta = p.minimo - saldoNum;\n    mensagens = [\n      `Olá ${nome}! Para o seu perfil (${perfil}), a opção de entrada é **${p.produto}** (mínimo ${brl(p.minimo)}). Seu saldo atual é ${brl(saldoNum)}, faltam ${brl(falta)} para investir. Rentabilidade: ${p.rentabilidade}.`,\n      `Oi ${nome}! Recomendação para perfil ${perfil}: **${p.produto}** (mínimo ${brl(p.minimo)}). Com mais ${brl(falta)} você atinge o mínimo. Rentabilidade: ${p.rentabilidade}.`,\n      `${nome}, indo direto ao ponto: o produto ideal para o perfil ${perfil} é **${p.produto}**, mas o mínimo é ${brl(p.minimo)} e você tem ${brl(saldoNum)}. Faltam ${brl(falta)}.`\n    ];\n  }\n\n  // Acrescenta o tom do perfil em todas as mensagens\n  const foco = focoPerfil[normaliza(perfil)] || \"\";\n  mensagens = mensagens.map(m => `${m} ${foco}`.trim());\n\n  return {\n    nome,\n    email,\n    perfil,\n    saldo_texto: c.saldo,\n    saldo_num: saldoNum,\n    recomendacao: escolhido,\n    motivo,\n    mensagens,\n    mensagem_escolhida: pick(mensagens),\n  };\n});\n\n// ===== 4) Saída =====\nreturn [{\n  json: {\n    ok: true,\n    total_clientes: resultados.length,\n    total_investimentos: investimentos.length,\n    resultados\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        -288
+      ],
+      "id": "52cfc46a-9131-4070-b872-97ea93fcfb15",
+      "name": "Criar mensagem personalizada"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -544,
+        -368
+      ],
+      "id": "5a76ef13-4188-459c-951c-99f3e28cd588",
+      "name": "Unificar e tabelar dados"
+    },
+    {
+      "parameters": {
+        "url": "https://digitalinnovationone.github.io/dio-lab-assistente-investimentos-rpa-n8n/data.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -848,
+        -272
+      ],
+      "id": "a059276e-a86b-40c4-9ec7-da9c9b9a5ece",
+      "name": "HTTP Request - Coletar investimentos"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega o CSV como texto vindo do HTTP Request\nconst entrada = $input.first().json;\nconst csvRaw = entrada.data ?? entrada.body ?? entrada;\nconst text = (typeof csvRaw === \"string\") ? csvRaw : JSON.stringify(csvRaw);\n\n// Quebra em linhas e remove linhas vazias\nconst lines = text.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);\n\n// Detecta o separador (; ou ,) pela linha de cabeçalho\nconst sep = lines[0].includes(\";\") ? \";\" : \",\";\n\nconst headers = lines[0].split(sep).map(h => h.trim());\n\nconst investimentos = lines.slice(1).map(line => {\n  const cols = line.split(sep).map(c => c.trim());\n  const obj = {};\n  headers.forEach((h, i) => obj[h] = cols[i] ?? \"\");\n\n  // Normaliza \"minimo\" para número (aceita 1000, 1.000,50, R$ 500,00)\n  if (\"minimo\" in obj) {\n    let v = String(obj.minimo).replace(/[^\\d,.-]/g, \"\");\n    if (v.includes(\",\")) v = v.replace(/\\./g, \"\").replace(\",\", \".\");\n    obj.minimo = Number(v) || 0;\n  }\n\n  return obj;\n});\n\nreturn [{ json: { investimentos } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        -240
+      ],
+      "id": "5ad96611-b0cc-4476-8b59-7f436dc24703",
+      "name": "Organizar dados"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resultados = $json.resultados || [];\n\nfunction parseBRL(valor) {\n  if (!valor) return 0;\n  const s = String(valor)\n    .replace(\"R$\", \"\")\n    .replace(/\\./g, \"\")\n    .replace(\",\", \".\")\n    .replace(/[^\\d.]/g, \"\")\n    .trim();\n  const n = Number(s);\n  return Number.isFinite(n) ? n : 0;\n}\n\n// retorna UM ITEM por cliente\nconst out = resultados.map(c => {\n  const saldoNum = c.saldo_num ?? parseBRL(c.saldo_texto ?? c.saldo);\n\n  return {\n    json: {\n      email_to: String(c.email || \"\").trim(),\n      nome: String(c.nome || \"\").trim(),\n      perfil: c.perfil,\n      saldo_texto: c.saldo_texto ?? c.saldo,\n      saldo_num: saldoNum,\n      recomendacao: c.recomendacao,\n      motivo: c.motivo,\n      mensagem_base: c.mensagem_escolhida || c.mensagem || \"\",\n      copy_rules: {\n        idioma: \"pt-BR\",\n        tom: \"amigável e profissional\",\n        tamanho: \"curto (4-6 linhas)\",\n        evitar: [\"promessas de ganho\", \"garantias\", \"linguagem agressiva\"]\n      }\n    }\n  };\n});\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -272
+      ],
+      "id": "93fc96ed-dec0-440b-a35f-f6e2a9ca140a",
+      "name": "Preparar mensagem/contexto IA"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Escreva um e-mail curto em pt-BR para o cliente abaixo, sem prometer ganhos e sem garantias.\n\nCliente:\n- Nome: {{ $json.nome }}\n- Perfil: {{ $json.perfil }}\n- Saldo: {{ $json.saldo_texto }}\n\nRecomendação:\n- Produto: {{ $json.recomendacao.produto }}\n- Mínimo: R$ {{ $json.recomendacao.minimo }}\n- Rentabilidade: {{ $json.recomendacao.rentabilidade }}\n- Situação: {{ $json.motivo }}\n\nMensagem base (use como referência, não copie): {{ $json.mensagem_base }}\n\nRegras:\n- Idioma: {{ $json.copy_rules.idioma }}\n- Tom: {{ $json.copy_rules.tom }}\n- Tamanho: {{ $json.copy_rules.tamanho }}\n- Evitar: {{ $json.copy_rules.evitar.join(\", \") }}\n\nResponda APENAS com um JSON válido, sem ``` e sem texto fora do JSON, neste formato:\n{\n  \"subject\": \"...\",\n  \"text_body\": \"...\",\n  \"html_body\": \"...\"\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        32,
+        -256
+      ],
+      "id": "ed4f2263-4d17-43ff-be38-f7cd30c5cc43",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "NM8dSALboeQI7eD7",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{$json.to}}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        688,
+        -208
+      ],
+      "id": "5853ea9a-18d4-4dd8-bd4d-5f29128454c6",
+      "name": "Send a message",
+      "webhookId": "c2028e04-6620-416c-82ee-e87ce01f354a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "MlMh9JgWeoucY4ts",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dados preparados antes da IA (mesma ordem dos itens)\n// >>> o nome tem que ser IGUAL ao do Code que monta os dados com copy_rules\nconst base = $('Preparar mensagem/contexto IA').all();\n\n// Pega o texto da resposta da IA, seja qual for o formato do nó\nfunction extrairTexto(r) {\n  return (\n    r.content?.parts?.[0]?.text ??                  // Gemini (simplificado)\n    r.candidates?.[0]?.content?.parts?.[0]?.text ?? // Gemini (completo)\n    r.output?.[0]?.content?.[0]?.text ??            // OpenAI (responses)\n    r.message?.content ??                           // OpenAI (chat)\n    r.text ??\n    (typeof r.content === \"string\" ? r.content : \"\") ??\n    \"\"\n  );\n}\n\n// Converte o texto em objeto (remove ```json ... ``` e lixo em volta)\nfunction parseJSON(texto) {\n  if (texto && typeof texto === \"object\") return texto;\n  let s = String(texto || \"\").replace(/```json|```/gi, \"\").trim();\n  const ini = s.indexOf(\"{\");\n  const fim = s.lastIndexOf(\"}\");\n  if (ini >= 0 && fim > ini) s = s.slice(ini, fim + 1);\n  try { return JSON.parse(s); } catch (e) { return null; }\n}\n\n// Gera um HTML simples a partir do texto puro (para quando a IA não mandar html)\nfunction textoParaHtml(t) {\n  return String(t || \"\")\n    .split(/\\n{2,}/)\n    .map(p => `<p>${p.replace(/\\n/g, \"<br>\")}</p>`)\n    .join(\"\");\n}\n\nconst brl = (n) =>\n  Number(n || 0).toLocaleString(\"pt-BR\", { style: \"currency\", currency: \"BRL\" });\n\nreturn $input.all().map((item, i) => {\n  const r = item.json;\n  const j = base[i]?.json || {};\n\n  const ia = parseJSON(extrairTexto(r));\n  const ok = !!(ia && ia.subject && (ia.text_body || ia.html_body));\n\n  // Plano B: se a IA falhar, usa a mensagem estática do MVP\n  const subject = ok\n    ? String(ia.subject).trim()\n    : `Sugestão de investimento: ${j.recomendacao?.produto || \"para o seu perfil\"}`;\n\n  const text_body = ok\n    ? String(ia.text_body || \"\").trim()\n    : `Olá ${j.nome},\\n\\n${j.mensagem_base || \"\"}\\n\\nAtenciosamente,\\nSua Equipe de Investimentos`;\n\n  const html_body = ok && ia.html_body\n    ? String(ia.html_body).trim()\n    : textoParaHtml(text_body);\n\n  return {\n    json: {\n      ok,\n      to: j.email_to,\n      subject,\n      text_body,\n      html_body,\n\n      // (opcional) manter alguns campos úteis pra debug/aula\n      meta: {\n        nome: j.nome,\n        perfil: j.perfil,\n        produto: j.recomendacao?.produto,\n        minimo: brl(j.recomendacao?.minimo),\n        rentabilidade: j.recomendacao?.rentabilidade,\n        motivo: j.motivo,\n        origem_texto: ok ? \"ia\" : \"fallback_estatico\"\n      }\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        -224
+      ],
+      "id": "000ab1ed-2ab3-46de-b5fe-25abcdf42bce",
+      "name": "Preparar dados e-mail"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fe30910e-91cb-49f5-be55-68cfc7bccf0a",
+              "leftValue": "={{ $json.to}} }}",
+              "rightValue": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        512,
+        -240
+      ],
+      "id": "b1193bde-7a66-4fa5-96b7-627f8a94d474",
+      "name": "If"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Coletar investimentos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Unificar e tabelar dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar mensagem personalizada": {
+      "main": [
+        [
+          {
+            "node": "Preparar mensagem/contexto IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unificar e tabelar dados": {
+      "main": [
+        [
+          {
+            "node": "Criar mensagem personalizada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Coletar investimentos": {
+      "main": [
+        [
+          {
+            "node": "Organizar dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Organizar dados": {
+      "main": [
+        [
+          {
+            "node": "Unificar e tabelar dados",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Preparar mensagem/contexto IA": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Preparar dados e-mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar dados e-mail": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "48bfb238-3ea4-4ecf-8b23-155c6828c831",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "68a7a429ebe6e990f6a85205d5677f76ddae96ea99e403c2b813d40fd38507fd"
+  },
+  "nodeGroups": [],
+  "id": "12zsxp7xhf2iEtBA",
+  "tags": []
+}
